@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"sync/atomic"
 )
@@ -128,6 +129,7 @@ func main() {
 		broker.Publish(topic, payload)
 		fmt.Fprintln(w, "ok")
 	})
+
 	http.HandleFunc("/subscribe", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusBadRequest)
@@ -171,7 +173,11 @@ func main() {
 		}
 
 	})
+	PORT := os.Getenv("PORT")
+	if PORT == "" {
+		PORT = "8000"
+	}
 
-	log.Println("listen on :8000")
+	log.Println("listen on :" + PORT)
 	log.Fatal(http.ListenAndServe(":8000", nil))
 }
