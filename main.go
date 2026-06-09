@@ -83,6 +83,16 @@ func (b *Broker) run() {
 				}
 			}
 
+		case r := <-b.unsubCh:
+			if subs[r.sub.topic] != nil {
+				topicSubs := subs[r.sub.topic]
+				delete(topicSubs, r.sub.id)
+				if len(topicSubs) == 0 {
+					delete(subs, r.sub.topic)
+				}
+			}
+			close(r.sub.c)
+			r.done <- struct{}{}
 		}
 	}
 
@@ -100,7 +110,19 @@ func (b *Broker) Subscribe(topic string) (*Subscriber, error) {
 	}
 }
 
-// func (b *Broker)
+func (b *Broker) Unsubscribe(subscriber *Subscriber) {
+	if subscriber == nil {
+		return
+	}
+	un := unsubReq{sub: subscriber, done: make(chan struct{})}
+
+	select {
+	case b.unsubCh <- un:
+		<-un.done
+	case <-b.done:
+	}
+
+}
 
 func (b *Broker) Publish(topic string, payload []byte) {
 	message := Message{Topic: topic, Payload: payload}
@@ -168,11 +190,13 @@ func main() {
 				flusher.Flush()
 			case <-r.Context().Done():
 				log.Printf("User disconnected %q", topic)
+				broker.Unsubscribe(s)
 				return
 			}
 		}
 
 	})
+
 	PORT := os.Getenv("PORT")
 	if PORT == "" {
 		PORT = "8000"
